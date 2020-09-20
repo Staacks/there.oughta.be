@@ -1,0 +1,274 @@
+<html>
+<head>
+    <script src="include/atrament.min.js"></script>
+    <meta name="viewport" content="width=806, user-scalable=no">
+    <link rel="stylesheet" href="font/stylesheet.css"/>
+    <link rel="stylesheet" href="include/style.css"/>
+</head>
+<body>
+    <div id="workarea">
+        <canvas id="cstart" width="800" height="480"></canvas>
+        <canvas id="ctext" width="800" height="480"></canvas>
+        <canvas id="cdraw" width="800" height="480"></canvas>
+    </div>
+    <ul id="tabs"><li id="tstart" onclick="switchTab('start')">1. Absender</li><li id="ttext" onclick="switchTab('text')">2. Text</li><li id="tdraw" onclick="switchTab('draw')">3. Malen</li><li id="tdone" onclick="switchTab('done')">4. Abschicken</li></ul>
+    <div id="toolbar">
+        <p class="grouped gstart">Gebt hier den Absender f&uuml;r die Nachricht ein. (z.B. &quot;Ernie &amp; Bert&quot;, &quot;Kevin&quot; oder &quot;Familie Feuerstein&quot;)</p>
+        <p class="grouped gstart">Absender: <input id="author" size="30" onchange="updateAuthor()" oninput="updateAuthorTimeout()" /></p>
+
+        <div class="grouped gtext" id="textinput">
+            <textarea id="text" size="50" onchange="updateText()" oninput="updateTextTimeout()" onfocus="textTouched()" >Gebt hier eure Nachricht ein...</textarea>
+            <select id="font" size="1" onchange="updateText()" oninput="updateTextTimeout()">
+                <option value="caviar_dreamsregular" style="font-family: caviar_dreamsregular;">Caviar Dreams</option>
+                <option value="dancing_script_otregular" style="font-family: dancing_script_otregular;">Dancing Script</option>
+                <option value="josefin_sansregular" style="font-family: josefin_sansregular;">Josefin Sans</option>
+                <option value="pacificoregular" style="font-family: pacificoregular;">Pacifico</option>
+                <option value="qikki_regregular" style="font-family: qikki_regregular;">Qikki</option>
+                <option value="serif" style="font-family: serif;">Serif (System)</option>
+                <option value="sans-serif" style="font-family: sans-serif;">Sans Serif (System)</option>
+                <option value="monospace" style="font-family: monospace;">Monospace (System)</option>
+            </select>
+            <p id="linewarning" style="display:none; color: #00a000;">Tipp: Deine Nachricht wird sehr klein angezeigt (siehe Vorschau oben). Der Text passt eventuell besser auf die Seite, wenn du noch Zeilenumbr&uuml;che einf&uuml;gst oder entfernst.</p>
+        </div>
+
+        <p class="grouped gdraw">Ihr k&ouml;nnt die Nachricht noch versch&ouml;nern, indem ihr einfach in dem Feld oben malt.</p>
+        <button class="grouped gdraw" onclick="clearDrawing()">Zeichnung leeren</button>
+        <button class="grouped gdraw" onclick="selectPen()">Zeichnen</button>
+        <button class="grouped gdraw" onclick="selectEraser()">Radieren</button>
+
+        <p class="grouped gdone"><b style="font-size: 200%;">Moooment.</b> Alles fertig? Bitte schaut nochmal auf die Vorschau oben. Alles richtig? Dann dr&uuml;ckt auf &quot;Abschicken&quot; und eure Nachricht wird in K&uuml;rze erscheinen:</p>
+        <div class="grouped gdone" id="submitblock" style="text-align: center"><span style="font-size: 300%; font-weight: bold">&rightarrow;&nbsp;</span><button style="font-size: 150%" onclick="submit()">Abschicken.</button><span style="font-size: 300%; font-weight: bold">&nbsp;&leftarrow;</span></div>
+        <p class="grouped gdone" id="lineerror" style="display:none; color: #a00000; font-weight: bold">Fehler: Dein Text wird an den R&auml;ndern abgeschnitten. Bitte k&uuml;rzen oder Zeilenumbr&uuml;che anpassen!</p>
+        <p class="grouped gdone" id="authorerror" style="display:none; color: #a00000; font-weight: bold">Fehler: Es fehlt noch ein Absender!</p>
+
+    </div>
+    <script>
+        let canvas = document.querySelector('#cdraw');
+        let sketchpad = new Atrament(canvas, {width: 800, height: 480});
+
+        var textUntouched = true;
+
+        function switchTab(target) {
+            var tabs = document.getElementById("tabs").children;
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.toggle("active", "t"+target == tabs[i].id); 
+            }
+
+            var el = document.getElementsByClassName("grouped");
+            for (var i = 0; i < el.length; i++) {
+                el[i].classList.toggle("hidden", !el[i].classList.contains("g"+target)); 
+            }
+
+            var el = document.getElementsByTagName("canvas");
+            for (var i = 0; i < el.length; i++) {
+                el[i].classList.toggle("disabled", "c"+target != el[i].id); 
+            }
+
+            updateAuthor();
+            if (!textUntouched)
+                updateText();
+        }
+
+        function clearDrawing() {
+            sketchpad.clear();
+        }
+
+        function selectPen() {
+            sketchpad.mode = "draw";
+        }
+
+        function selectEraser() {
+            sketchpad.mode = "erase";
+        }
+
+        function updateAuthor() {
+            var ctx = document.getElementById("cstart").getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = "30px josefin_sansregular";
+            let text = document.getElementById("author").value;
+            let size = ctx.measureText(text);
+            ctx.fillText(text, 790 - size.width, 470);
+        }
+
+        var updateAuthorTO = false;
+        function updateAuthorTimeout() {
+            if (updateAuthorTO !== false) {
+                clearTimeout(updateAuthorTO);
+                updateAuthorTO = false;
+            }
+            updateAuthorTO = setTimeout(updateAuthor, 500);
+        }
+
+        function updateText() {
+            var ctx = document.getElementById("ctext").getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let text = document.getElementById("text").value;
+            let font = document.getElementById("font").value;
+            let lines = text.trim().split('\n');
+            let n = lines.length;
+            for (var i = 0; i < n; i++)
+                lines[i] = lines[i].trim();
+
+            var fontsize = 110;
+            var w, h;
+            while (fontsize > 30) {
+                fontsize -= 10;
+                h = fontsize * 1.25;
+                w = 0;
+                ctx.font = fontsize+"px " + font;
+                for (var i = 0; i < n; i++) {
+                    let size = ctx.measureText(lines[i]);
+                    if (size.width > w)
+                        w = size.width;
+                }
+                if (n*h < 400 && w < 720)
+                  break;
+            }
+            if (w > 790 || n*h > 470) {
+                document.getElementById("lineerror").style.display = "block";
+                document.getElementById("authorerror").style.display = "none";
+                document.getElementById("submitblock").style.display = "none";
+            } else if (document.getElementById("author").value == "") {
+                document.getElementById("lineerror").style.display = "none";
+                document.getElementById("authorerror").style.display = "block";
+                document.getElementById("submitblock").style.display = "none";
+            } else {
+                document.getElementById("lineerror").style.display = "none";
+                document.getElementById("authorerror").style.display = "none";
+                document.getElementById("submitblock").style.display = "block";
+            }
+            if (fontsize < 50)
+                document.getElementById("linewarning").style.display = "block";
+            else
+                document.getElementById("linewarning").style.display = "none";
+
+            ctx.font = fontsize+"px " + font;
+            var y = (480 - n*h) / 2 + h*2/3;
+            for (var i = 0; i < n; i++) {
+                let size = ctx.measureText(lines[i]);
+                ctx.fillText(lines[i], (790 - size.width)/2, y);
+                y += h;
+            }
+            var data = document.getElementById("ctext").getContext('2d').getImageData(0, 0, 800, 480);
+            let d = data.data;
+            for (var y = 0; y < 480; y++) {
+                for (var x = 0; x < 800; x++) {
+                    let index = 4*(y * 800 + x);
+                    if (d[index+3] > 127 && (d[index] < 127 && d[index+1] < 127 && d[index+2] < 127)) {
+                        d[index] = 0;
+                        d[index+1] = 0;
+                        d[index+2] = 0;
+                        d[index+3] = 255;
+                    } else {
+                        d[index] = 255;
+                        d[index+1] = 255;
+                        d[index+2] = 255;
+                        d[index+3] = 0;
+                    }
+                }
+            }
+            document.getElementById("ctext").getContext('2d').putImageData(data, 0, 0);
+        }
+
+        var updateTextTO = false;
+        function updateTextTimeout() {
+            if (updateTextTO !== false) {
+                clearTimeout(updateTextTO);
+                updateTextTO = false;
+            }
+            updateTextTO = setTimeout(updateText, 500);
+        }
+
+        function textTouched() {
+            if (textUntouched) {
+                textUntouched = false;
+                document.getElementById("text").value = "";
+            }
+        }
+
+        function randomizeSelect(id) {
+            var options = document.getElementById(id).children;
+            let i = Math.floor(Math.random() * options.length);
+            options[i].selected = true;
+        }
+
+        function submit() {
+            var d1 = document.getElementById("cstart").getContext('2d').getImageData(0, 0, 800, 480).data;
+            var d2 = document.getElementById("ctext").getContext('2d').getImageData(0, 0, 800, 480).data;
+            var d3 = document.getElementById("cdraw").getContext('2d').getImageData(0, 0, 800, 480).data;
+
+            var out = [];
+
+            function isBlack(x, y) {
+                let index = 4*(y * 800 + x) + 3;
+                return d1[index] > 127 || d2[index] > 127 || d3[index] > 127;
+            }
+
+            var bi = 0;
+            for (var y = 0; y < 480; y++) {
+                //Repeated encoding
+                var repeated = [];
+                var white = true;
+                var count = 0;
+                for (var x = 0; x < 800; x++) {
+                    let black = isBlack(x, y);
+                    if (count == 255) {
+                        repeated.push(count);
+                        count = 0;
+                    }
+                    if (white && black) {
+                        white = false;
+                        repeated.push(count);
+                        count = 0;
+                    } else if (!white && !black) {
+                        white = true;
+                        repeated.push(count);
+                        count = 0;
+                    }
+                    count++;
+                }
+                if (count > 0)
+                    repeated.push(count);
+
+                if (repeated.length > 100) {
+                    out[bi] = 0;
+                    bi++;
+
+                    //Pixelmap encpding
+                    for (var x = 0; x < 800; x+=8) {
+                        var b = 0;
+                        for (var i = 0; i < 8; i++) {
+                            b = b << 1;
+                            if (isBlack(x+i, y))
+                                b = b | 0x01;
+                        }
+                        out[bi] = b;
+                        bi++;
+                    }
+                } else {
+                    out[bi] = repeated.length;
+                    bi++;
+                    for (var i = 0; i < repeated.length; i++) {
+                        out[bi] = repeated[i];
+                        bi++;
+                    }
+                }
+            }
+
+            var bytes = new Uint8Array(out);
+            console.log(bytes);
+
+            var xhr = new XMLHttpRequest;
+            xhr.open("POST", "https://MYURL/submit.php", false);
+            xhr.onload = function () {
+                window.location.replace("https://MYURL/success.html");
+            };
+            xhr.send(bytes);
+        }
+
+        randomizeSelect("font");
+        switchTab("start");
+    </script>
+</body>
+</html>

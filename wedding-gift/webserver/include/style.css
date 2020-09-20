@@ -1,0 +1,91 @@
+body, html {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Oxygen, Cantarell, sans-serif;
+    font-size: 3vmin;
+}
+
+p {
+    line-height: 1;
+    margin: 0.25em 0;
+}
+
+body {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: min(60vw, 84vh) 6vh 10vh;
+}
+
+#workarea {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+canvas {
+    margin: 2px;
+    position: absolute;
+    top: 0;
+    height: calc(min(60vw, 84vh) - 6px);
+    width: calc(min(100vw, 140vh)  - 6px);
+}
+
+canvas:first-child {
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2) inset, 0 5px 20px 0 rgba(0, 0, 0, 0.19) inset;
+}
+
+canvas.disabled {
+    pointer-events: none;
+}
+
+#tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: auto;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#tabs li {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0.5em;
+    padding: 0;
+    cursor: pointer;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2), 0 1px 5px 0 rgba(0, 0, 0, 0.19);
+}
+
+#tabs li.active {
+    background: #d0f0ff;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2) inset, 0 1px 5px 0 rgba(0, 0, 0, 0.19) inset;
+}
+
+#toolbar {
+    padding: 0 1em;
+    line-height: 1;
+}
+
+.hidden {
+    display: none !important
+}
+
+#textinput {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: 5em;
+}
+
+textarea {
+    width: calc(100% - 1em);
+    height: 100%;
+}
+
+input, select, button, textarea {
+    font-size: 1em;
+    border: 3px solid black;
+}
