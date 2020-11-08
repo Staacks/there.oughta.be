@@ -16,11 +16,25 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
+//UDP port to listen for status updates
 #define PORT 1234
+
+//Animation speed
 #define ANIMSTEP 0.5
 
-const int w = 192;
-const int h = 64;
+//Resolution, three panels with 64x64 each.
+#define W 192
+#define H 64
+
+//Number of CPU cores (or threads) to be represented on the ring
+#define CORES 12
+
+//Temperature thresholds for cool (blue), medium (green/yellow) and hot (red)
+#define T1 40.0 //Do not omit the decimal point. This will be used in the OpenGL shader which will otherwise interpret it as a float literal
+#define T2 60.0
+#define T3 80.0
+
+//That's it up here, but you might also want to change the settings for your RGB matrix in line 462 below
 
 using rgb_matrix::GPIO;
 using rgb_matrix::RGBMatrix;
@@ -28,11 +42,10 @@ using rgb_matrix::Canvas;
 
 using namespace rgb_matrix;
 
-const int cores = 12;
 float temperature = 30.f;
-float cpu[cores] = {0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.};
+float cpu[CORES];
 float ttemperature = 30.f;
-float tcpu[cores] = {0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.};
+float tcpu[CORES];
 
 float t = 0.f;
 float updateTime = -10.0f;
@@ -54,9 +67,9 @@ static const EGLint configAttribs[] = {
 // Width and height of the desired framebuffer
 static const EGLint pbufferAttribs[] = {
     EGL_WIDTH,
-    w,
+    W,
     EGL_HEIGHT,
-    h,
+    H,
     EGL_NONE,
 };
 
@@ -141,6 +154,7 @@ static const GLfloat vcoords[] = {
 };
 
 #define STRINGIFY(x) #x
+#define RESTRINGIFY(x) STRINGIFY(x)
 static const char *vertexShaderCode = STRINGIFY(
     attribute vec3 pos;
     attribute vec2 coord;
@@ -151,9 +165,13 @@ static const char *vertexShaderCode = STRINGIFY(
     }
 );
 
-static const char *fragmentShaderCode = STRINGIFY(
+static const char *fragmentShaderCode1 = STRINGIFY(
+    const int CORES = ) RESTRINGIFY(CORES) STRINGIFY(;
+    const float T1 = ) RESTRINGIFY(T1) STRINGIFY(;
+    const float T2 = ) RESTRINGIFY(T2) STRINGIFY(;
+    const float T3 = ) RESTRINGIFY(T3) STRINGIFY(;
     uniform float temperature;
-    uniform float cpu[12];
+    uniform float cpu[CORES];
     vec3 mcolor = vec3(0.1, 0.6, 0.4);
     vec3 mcolorwarm = vec3(0.5, 0.5, 0.1);
     vec3 mcolorhot = vec3(0.6, 0.2, 0.1);
@@ -175,22 +193,14 @@ static const char *fragmentShaderCode = STRINGIFY(
 
     void main() {
         vec2 coords = fragCoord.xy*0.5;
-        float phi = (atan(coords.y, coords.x)+3.1415926538)/3.1415926538*6.0;
+        float phi = (atan(coords.y, coords.x)+3.1415926538)/3.1415926538*float(CORES)*0.5;
+);
 
-        cpuf += clamp(1.0-abs(phi-0.0), 0.0, 1.0)*cpu[0];
-        cpuf += clamp(1.0-abs(phi-1.0), 0.0, 1.0)*cpu[1];
-        cpuf += clamp(1.0-abs(phi-2.0), 0.0, 1.0)*cpu[2];
-        cpuf += clamp(1.0-abs(phi-3.0), 0.0, 1.0)*cpu[3];
-        cpuf += clamp(1.0-abs(phi-4.0), 0.0, 1.0)*cpu[4];
-        cpuf += clamp(1.0-abs(phi-5.0), 0.0, 1.0)*cpu[5];
-        cpuf += clamp(1.0-abs(phi-6.0), 0.0, 1.0)*cpu[6];
-        cpuf += clamp(1.0-abs(phi-7.0), 0.0, 1.0)*cpu[7];
-        cpuf += clamp(1.0-abs(phi-8.0), 0.0, 1.0)*cpu[8];
-        cpuf += clamp(1.0-abs(phi-9.0), 0.0, 1.0)*cpu[9];
-        cpuf += clamp(1.0-abs(phi-10.0), 0.0, 1.0)*cpu[10];
-        cpuf += clamp(1.0-abs(phi-11.0), 0.0, 1.0)*cpu[11];
-        cpuf += clamp(1.0-abs(phi-12.0), 0.0, 1.0)*cpu[0];
+void fragmentShaderCodeLoop(char *str, int i) {
+    sprintf(str, "cpuf += clamp(1.0-abs(phi-%d.0), 0.0, 1.0)*cpu[%d];", i, i % CORES);
+}
 
+static const char *fragmentShaderCode2 = STRINGIFY(
         vec2 p = fragCoord.xy * 0.5 * 10.0 - vec2(19.0);
         vec2 i = p;
         float c = 1.0;
@@ -205,7 +215,7 @@ static const char *fragmentShaderCode = STRINGIFY(
         c /= 8.0;
         c = 1.5 - sqrt(pow(c, 2.0));
         mcolor.g = clamp(coords.x, 0.0, 1.0);
-        mcolor = smoothstep(60.0, 40.0, temperature)*mcolor + smoothstep(40.0, 60.0, temperature)*smoothstep(80.0, 60.0, temperature)*mcolorwarm + smoothstep(60.0, 80.0, temperature)*mcolorhot;
+        mcolor = smoothstep(T2, T1, temperature)*mcolor + smoothstep(T1, T2, temperature)*smoothstep(T3, T2, temperature)*mcolorwarm + smoothstep(T2, T3, temperature)*mcolorhot;
          
         ccolor = smoothstep(50.0, 0.0, cpuf)*ccolor + smoothstep(0.0, 50.0, cpuf)*smoothstep(100.0, 50.0, cpuf)*ccolorwarm + smoothstep(50.0, 100.0, cpuf)*ccolorhot;
         ccolor *= circle(coords, 0.25, 0.01);
@@ -322,7 +332,7 @@ void receiveUDP() {
                             break;
                     default:
                             int k = j-1;
-                            if (k >= cores)
+                            if (k >= CORES)
                                 break;
                             tcpu[k] = entry;
                             break;
@@ -336,6 +346,21 @@ void receiveUDP() {
 
         close(s);        
     }
+}
+
+bool checkShader(GLuint shader) {
+    GLint success = 0;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (success == GL_FALSE) {
+	    GLint length = 0;
+	    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
+
+	    std::vector<GLchar> errorLog(length);
+	    glGetShaderInfoLog(shader, length, &length, &errorLog[0]);
+        fprintf(stderr, "Shader compilation failed!\n%s\n", errorLog);
+        return false;
+    }
+    return true;
 }
 
 int main(int argc, char *argv[]) {
@@ -416,9 +441,25 @@ int main(int argc, char *argv[]) {
     vert = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vert, 1, &vertexShaderCode, NULL);
     glCompileShader(vert);
+    if (!checkShader(vert))
+        return EXIT_FAILURE;
+
+    const int codelength = strlen(fragmentShaderCode1) + (CORES+1)*60 + strlen(fragmentShaderCode2);
+    char fragmentShaderCode[codelength];
+    strcpy(fragmentShaderCode, fragmentShaderCode1);
+    for (int i = 0; i <= CORES; i++) {
+        char loopCode[60];
+        fragmentShaderCodeLoop(loopCode, i);
+        strcat(fragmentShaderCode, loopCode);
+    }
+    strcat(fragmentShaderCode, fragmentShaderCode2);
+    static const char * cFragmentShaderCode = fragmentShaderCode;
+
     frag = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(frag, 1, &fragmentShaderCode, NULL);
+    glShaderSource(frag, 1, &cFragmentShaderCode, NULL);
     glCompileShader(frag);
+    if (!checkShader(frag))
+        return EXIT_FAILURE;
     glAttachShader(program, frag);
     glAttachShader(program, vert);
     glLinkProgram(program);
@@ -469,15 +510,20 @@ int main(int argc, char *argv[]) {
     runtime.gpio_slowdown = 0;
     RGBMatrix *matrix = rgb_matrix::CreateMatrixFromFlags(&argc, &argv, &defaults, &runtime);
     if (matrix == NULL)
-        return 1;
+        return EXIT_FAILURE;
     FrameCanvas *canvas = matrix->CreateFrameCanvas();
 
     signal(SIGTERM, InterruptHandler);
     signal(SIGINT, InterruptHandler);
 
-    unsigned char *buffer = (unsigned char *)malloc(w * h * 3);
+    unsigned char *buffer = (unsigned char *)malloc(W * H * 3);
 
     std::thread networking(receiveUDP);
+
+    for (int i = 0; i < CORES; i++) {
+        cpu[i] = 0.0;
+        tcpu[i] = 0.0;
+    }
 
     while (!interrupt_received) {
 
@@ -489,7 +535,7 @@ int main(int argc, char *argv[]) {
             temperature += 0.2*ANIMSTEP;
         if (ttemperature < temperature)
             temperature -= 0.2*ANIMSTEP;
-        for (int i = 0; i < cores; i++) {
+        for (int i = 0; i < CORES; i++) {
             if (tcpu[i] > cpu[i])
                 cpu[i] += ANIMSTEP;
             if (tcpu[i] < cpu[i])
@@ -497,14 +543,14 @@ int main(int argc, char *argv[]) {
         }
 
         glUniform1f(temperatureLoc, temperature);
-        glUniform1fv(cpuLoc, cores, cpu);
+        glUniform1fv(cpuLoc, CORES, cpu);
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 12);
-        glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+        glReadPixels(0, 0, W, H, GL_RGB, GL_UNSIGNED_BYTE, buffer);
 
-        for (int x = 0; x < w; x++) {
-            for (int y = 0; y < h; y++) {
-                int index = 3*(x+y*w);
+        for (int x = 0; x < W; x++) {
+            for (int y = 0; y < H; y++) {
+                int index = 3*(x+y*W);
                 canvas->SetPixel(x, y, buffer[index], buffer[index+1], buffer[index+2]);
             }
         }
