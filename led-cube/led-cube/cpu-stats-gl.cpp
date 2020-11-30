@@ -16,6 +16,9 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
+// Define interval for auto blanking - set to zero to disable
+#define BLANKINTERVAL 12
+
 //UDP port to listen for status updates
 #define PORT 1234
 
@@ -36,7 +39,6 @@
 
 //That's it up here, but you might also want to change the settings for your RGB matrix in line 462 below
 
-using rgb_matrix::GPIO;
 using rgb_matrix::RGBMatrix;
 using rgb_matrix::Canvas;
 
@@ -279,6 +281,15 @@ static const char *eglGetErrorStr() {
     return "Unknown error!";
 }
 
+std::string asString (const std::chrono::system_clock::time_point& tp)
+{
+     // convert to system time:
+     std::time_t t = std::chrono::system_clock::to_time_t(tp);
+     std::string ts = std::ctime(&t);// convert to calendar time
+     ts.resize(ts.size()-1);         // skip trailing newline
+     return ts;
+}
+
 #define BUFLEN 512
 void receiveUDP() {
     struct sockaddr_in si_me, si_other;
@@ -505,9 +516,10 @@ int main(int argc, char *argv[]) {
     defaults.cols = 192;
     defaults.chain_length = 1;
     defaults.parallel = 1;
+//  defaults.brightness = 60;
 
     runtime.drop_privileges = 0;
-    runtime.gpio_slowdown = 0;
+    runtime.gpio_slowdown = 1;
     RGBMatrix *matrix = rgb_matrix::CreateMatrixFromFlags(&argc, &argv, &defaults, &runtime);
     if (matrix == NULL)
         return EXIT_FAILURE;
@@ -528,34 +540,42 @@ int main(int argc, char *argv[]) {
     while (!interrupt_received) {
 
         t += 0.01f;
-        glUniform1f(timeLoc, t);
-        glUniform1f(ageLoc, float(t - updateTime));
 
-        if (ttemperature > temperature)
-            temperature += 0.2*ANIMSTEP;
-        if (ttemperature < temperature)
-            temperature -= 0.2*ANIMSTEP;
-        for (int i = 0; i < CORES; i++) {
-            if (tcpu[i] > cpu[i])
-                cpu[i] += ANIMSTEP;
-            if (tcpu[i] < cpu[i])
-                cpu[i] -= ANIMSTEP;
+        // Grab the interval since last update
+        int quiet = int(t - updateTime);
+
+        // If we haven't heard anything for BLANKINTERVAL then don't update, blank the canvas and sleep for five seconds
+        if ((quiet > BLANKINTERVAL) && (BLANKINTERVAL > 0)){
+          canvas->Clear();
+          canvas = matrix->SwapOnVSync(canvas);
+          sleep(5);
+        } else {
+
+	        glUniform1f(timeLoc, t);
+        	glUniform1f(ageLoc, float(t - updateTime));
+
+	        if (ttemperature > temperature)
+	            temperature += 0.2*ANIMSTEP;
+	        if (ttemperature < temperature)
+	            temperature -= 0.2*ANIMSTEP;
+	        for (int i = 0; i < CORES; i++) {
+	            if (tcpu[i] > cpu[i])
+	                cpu[i] += ANIMSTEP;
+	            if (tcpu[i] < cpu[i])
+	                cpu[i] -= ANIMSTEP;
+	        }
+	        glUniform1f(temperatureLoc, temperature);
+	        glUniform1fv(cpuLoc, CORES, cpu);
+	        glDrawArrays(GL_TRIANGLE_STRIP, 0, 12);
+	        glReadPixels(0, 0, W, H, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+	        for (int x = 0; x < W; x++) {
+	            for (int y = 0; y < H; y++) {
+	                int index = 3*(x+y*W);
+	                canvas->SetPixel(x, y, buffer[index], buffer[index+1], buffer[index+2]);
+	            }
+	        }
+	        canvas = matrix->SwapOnVSync(canvas);
         }
-
-        glUniform1f(temperatureLoc, temperature);
-        glUniform1fv(cpuLoc, CORES, cpu);
-
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 12);
-        glReadPixels(0, 0, W, H, GL_RGB, GL_UNSIGNED_BYTE, buffer);
-
-        for (int x = 0; x < W; x++) {
-            for (int y = 0; y < H; y++) {
-                int index = 3*(x+y*W);
-                canvas->SetPixel(x, y, buffer[index], buffer[index+1], buffer[index+2]);
-            }
-        }
-
-        canvas = matrix->SwapOnVSync(canvas);
     }
 
     networking.join();
