@@ -44,6 +44,10 @@ const char updateAutoCyclesTopic[] = "watercontrol/updateAutoCycles";
 const char updateAutoCycleTopic[] = "watercontrol/updateAutoCycle";
 const char notifyDoneTopic[] = "watercontrol/notifyDone";
 
+//Garage door opener, see https://there.oughta.be/a/smart-garage-door
+const char triggerGarageDoorTopic[] = "garage/triggerGarageDoor";
+int garageDoorPin = 2;
+
 //End of configuration
 
 bool screenOff = false;
@@ -66,6 +70,8 @@ void setup() {
     pinMode(pins[i], OUTPUT);
     digitalWrite(pins[i], HIGH);
   }
+  pinMode(garageDoorPin, OUTPUT);
+  digitalWrite(garageDoorPin, HIGH);
   pinMode(pinButtonDecrease, INPUT_PULLUP);
   pinMode(pinButtonIncrease, INPUT_PULLUP);
   digitalWrite(pinButtonDecrease, INPUT_PULLUP);
@@ -540,6 +546,7 @@ void ensureMqtt() {
       mqttClient.subscribe(sprinklerTopic);
       mqttClient.subscribe(autoTopic);
       mqttClient.subscribe(stateTopic);
+      mqttClient.subscribe(triggerGarageDoorTopic);
     } else {
       for (int i = 0; i < 20; i++) {
         delay(500);
@@ -591,6 +598,10 @@ void onMqttMessage(int messageSize) {
       setAutoDuration(180, true);
     else
       setAutoDuration(0, true);
+  } else if (topic == triggerGarageDoorTopic) {
+    digitalWrite(garageDoorPin, LOW);
+    delay(250);
+    digitalWrite(garageDoorPin, HIGH);
   }
 }
 
