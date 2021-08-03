@@ -4,7 +4,8 @@ from collections import deque
 import threading
 import time
 
-camaddress = "http://192.168.122.1:8080/sony/camera/"
+camaddress = "http://192.168.122.1:8080/sony/camera/" #Older models like NEX-5T, a6000, ... (Also make sure that your remote control app on the cam itself is up to date)
+#camaddress = "http://192.168.122.1:10000/sony/camera" #Newer models like a6400, a7iii, ... (Note the missing trailing slash)
 sharpnessAverageCount = 2000 #Number of frames to average to get the "base sharpness"
 relativeTriggerIncrease = 1.25 #Camera is triggered if the sharpness rises by this factor above the base sharpness
 
