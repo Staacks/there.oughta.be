@@ -127,7 +127,7 @@ void loop() {
     } else {
       if (now - lastImageChange > 20000) {
         int nextImage = currentImage;
-        while (nextImage == currentImage)
+        while (nextImage == currentImage && storedImages > 1)
           nextImage = random(storedImages);
         showImage(nextImage);
         lastImageChange = millis();
@@ -335,9 +335,11 @@ bool pollImage(int id) {
   if (!file.write(decoded, outputLength)) {
     Serial.println("Write failed");
     file.close();
+    free(decoded);
     return false;
   }
   file.close();
+  free(decoded);
   
   Serial.print("Success. We now have ");
   Serial.print(storedImages);
