@@ -1,8 +1,22 @@
-# Code not available due to licence limitations
+# Simple BLE push button for Pico W
 
-Unfortunately, I am not allowed to share the code for the Bluetooth buttons of the video booth at the moment. The reason is that the Bluetooth support of the Raspberry Pi Pico W is still very new and my code is based on [hid_keyboard_demo.c](https://github.com/bluekitchen/btstack/blob/master/example/hid_keyboard_demo.c) of the Blue Kitchen Bluetooth stack, which has not (yet?) been properly migrated to the Raspberry Pi Foundation's [pico-examples](https://github.com/raspberrypi/pico-examples) repository. While [some rumors](https://github.com/raspberrypi/pico-sdk/issues/1164#issuecomment-1372677903) speak of an upcoming maker-friendly licence, the demo is currently only referenced by the pico-examples repository with the original Blue Kitchen licence, which explicitly prohibits any redistribution for commercial purposes. Since I receive ad revenues for my projects (i.e. Youtube) I cannot claim that there is no commercial purpose and hence I am not allowed to share my code at this point.
+This is the code for the BLE push button used in my bullet time video booth project at https://there.oughta.be/a/bullet-time-video-booth. Initially, I did not release it due to concerns about the license as it is only a slight modification of the [hog_keyboard_demo.c](https://github.com/bluekitchen/btstack/blob/master/example/hog_keyboard_demo.c) which is referenced in the Raspberry Pi Foundation's [pico-examples](https://github.com/raspberrypi/pico-examples) repository, but which is actually part of the Blue Kitchen's examples for their BTStack used on the Pico W - with a more restrictive license.
 
-If the code is eventually released under a more permissive licence, please let me know and I will happily share the changes I made.
+So, let's talk about that first:
 
-Until then, it is not too tricky to adapt [hid_keyboard_demo.c](https://github.com/bluekitchen/btstack/blob/master/example/hid_keyboard_demo.c). Connect the push button such that a GPIO pin is pulled to ground, enable the internal pullup of that GPIO pin and modify the demo such that a keypress is sent when the GPIO pin goes low.
+## License
+
+Important! This code is **not** released under the GNU GPL like most of my projects. It retains the original licenses of the original files it is based on. Please check the file headers for details and take particular note of BlueKitchen GmbH's license in blebutton.c as it is more restrictive, for example by prohibiting commercial use.
+
+## Usage
+
+This has been tested to build with the Pico SDK version 2.0.0. So, build a uf2 file from it and put it onto your Pico W.
+
+When powered, it will show up on Bluetooth scans as "OK-Button". To bond with it, you need a PIN which the device generates randomly and dumps to USB serial. So, monitor UART while bonding it for the first time. Once bonded, you can connect and reconnect as you like.
+
+You should connect the button to GPIO5 and GND. If these are bridged, it will send a keypress representing the space bar. That's it. That's all it does.
+
+GPIO5 is defined at the top and can easily be changed. The keycode for the space bar is lazily inserted in line 213 and can be changed there.
+
+As mentioned above, this is just a quick edit of the BLE HID keyboard example.
 
